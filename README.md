@@ -72,11 +72,15 @@ Create functions in your preferred language:
 
 ```bash
 telnyx-edge new-func --language=go --name=my-func
-telnyx-edge new-func --language=js --name=my-func
-telnyx-edge new-func --language=ts --name=my-func
 telnyx-edge new-func --language=python --name=my-func
-telnyx-edge new-func --language=rust --name=my-func
+telnyx-edge new-func --language=quarkus --name=my-func
 ```
+
+| Language | Template | Runtime |
+|----------|----------|---------|
+| Go | `go` | Go 1.25+ |
+| Python | `python` | Python 3.11+ |
+| Java | `quarkus` | Java 17+ (Quarkus) |
 
 ## Function Development
 
