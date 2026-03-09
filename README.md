@@ -71,15 +71,19 @@ telnyx-edge list
 Create functions in your preferred language:
 
 ```bash
-telnyx-edge new-func --language=go --name=my-func
+telnyx-edge new-func --language=javascript --name=my-func
+telnyx-edge new-func --language=typescript --name=my-func
 telnyx-edge new-func --language=python --name=my-func
+telnyx-edge new-func --language=go --name=my-func
 telnyx-edge new-func --language=quarkus --name=my-func
 ```
 
 | Language | Template | Runtime |
 |----------|----------|---------|
-| Go | `go` | Go 1.25+ |
+| JavaScript | `javascript` | Node.js 18+ |
+| TypeScript | `typescript` | Node.js 18+ |
 | Python | `python` | Python 3.11+ |
+| Go | `go` | Go 1.25+ |
 | Java | `quarkus` | Java 17+ (Quarkus) |
 
 ## Function Development
