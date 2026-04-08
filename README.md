@@ -71,8 +71,6 @@ telnyx-edge list
 Create functions in your preferred language:
 
 ```bash
-telnyx-edge new-func --language=javascript --name=my-func
-telnyx-edge new-func --language=typescript --name=my-func
 telnyx-edge new-func --language=python --name=my-func
 telnyx-edge new-func --language=go --name=my-func
 telnyx-edge new-func --language=quarkus --name=my-func
@@ -80,11 +78,13 @@ telnyx-edge new-func --language=quarkus --name=my-func
 
 | Language | Template | Runtime |
 |----------|----------|---------|
-| JavaScript | `javascript` | Node.js 18+ |
-| TypeScript | `typescript` | Node.js 18+ |
-| Python | `python` | Python 3.11+ |
-| Go | `go` | Go 1.25+ |
-| Java | `quarkus` | Java 17+ (Quarkus) |
+| Python | `python` | Python 3.11+ (ASGI) |
+| Go | `go` | Go 1.21+ |
+| Java | `quarkus` | Java 17+ (Quarkus Funqy) |
+
+<Note>
+JavaScript and TypeScript are not currently supported. Only Python, Go, and Quarkus (Java) runtimes are available.
+</Note>
 
 ## Function Development
 
@@ -95,8 +95,9 @@ Each function contains:
 ```
 my-function/
 ├── func.toml          # Function configuration
-├── handler.go         # Your function code (varies by language)
-└── go.mod             # Dependencies (varies by language)
+├── function/          # Function code (Python/Go)
+│   └── *.py or *.go
+└── pyproject.toml     # Dependencies (Python) or go.mod (Go)
 ```
 
 ### Configuration (func.toml)
