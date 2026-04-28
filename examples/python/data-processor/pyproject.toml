@@ -1,0 +1,27 @@
+[project]
+name = "function"
+description = ""
+version = "0.1.0"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+  { name="Developer", email="your@email.com"},
+]
+dependencies = [
+  # Add your runtime dependencies here
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+  "httpx",  # For HTTP client testing if needed
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,19 @@
+{
+  "name": "call-event-router",
+  "version": "1.0.0",
+  "description": "Telnyx Edge Function — typed Telnyx call/message event router",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "func start",
+    "dev": "ts-node index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

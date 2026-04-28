@@ -1,0 +1,32 @@
+[edge_compute]
+func_id = "middleware-patterns-demo"
+func_name = "middleware-patterns-go"
+
+[env_vars]
+# Middleware configuration
+LOG_LEVEL = "info"                                # Logging level (debug, info, warn, error)
+REQUEST_TIMEOUT = "30s"                           # Request timeout duration
+RATE_LIMIT_REQUESTS = "100"                       # Rate limit requests per minute
+CORS_ALLOWED_ORIGINS = "*"                        # CORS allowed origins
+
+# Service metadata
+SERVICE_NAME = "middleware-patterns"
+VERSION = "1.0.0"
+
+# Security/Debug (NEVER enable DEBUG_MODE in production)
+DEBUG_MODE = "false"                              # Enable verbose logging with sensitive data
+
+# Secrets configuration:
+# Use telnyx-edge secrets add <name> <value> to add the following secrets:
+# telnyx-edge secrets add AUTH_TOKEN "your-secure-bearer-token"
+# telnyx-edge secrets add JWT_SECRET "your-jwt-signing-secret"
+# telnyx-edge secrets add API_KEY "your-api-key"
+
+# Required secrets:
+# - AUTH_TOKEN: Bearer token for authentication middleware
+
+# Optional secrets:
+# - JWT_SECRET: Secret for JWT token validation middleware
+# - API_KEY: API key for external service authentication
+# - DATABASE_URL: Database connection for logging middleware
+# - REDIS_URL: Redis connection for rate limiting middleware

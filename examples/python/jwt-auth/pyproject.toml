@@ -1,0 +1,27 @@
+[project]
+name = "function"
+description = "JWT-based authentication and authorization service with role-based access control"
+version = "1.0.0"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+  { name="Telnyx Edge Compute", email="support@telnyx.com"},
+]
+dependencies = [
+  "PyJWT>=2.8.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+  "httpx",  # For HTTP client testing if needed
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"

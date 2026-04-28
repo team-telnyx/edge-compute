@@ -1,0 +1,15 @@
+[edge_compute]
+func_id = "call-event-router-ts-demo"
+func_name = "call-event-router-ts"
+
+[env_vars]
+MAX_EVENTS = "500"         # In-memory ring buffer size for processed events
+SERVICE_NAME = "call-event-router"
+VERSION = "1.0.0"
+
+# Secrets — add via: telnyx-edge secrets add <name> <value>
+#
+# TELNYX_WEBHOOK_SECRET  (recommended)
+#   Sign your Telnyx webhooks in the Mission Control Portal and set this
+#   secret to verify the x-telnyx-signature header on each incoming event.
+#   telnyx-edge secrets add TELNYX_WEBHOOK_SECRET "your-telnyx-webhook-secret"

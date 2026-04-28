@@ -1,0 +1,12 @@
+{
+  "name": "webhook-receiver",
+  "version": "1.0.0",
+  "description": "Telnyx Edge Function — webhook receiver with HMAC-SHA256 signature verification",
+  "main": "index.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

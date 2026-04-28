@@ -1,0 +1,23 @@
+[edge_compute]
+func_id = "background-jobs-python"
+func_name = "background-jobs-python"
+
+[env_vars]
+# Background job processing configuration
+DATABASE_PATH = "/tmp/jobs.db"                      # SQLite database path for job storage
+MAX_QUEUE_SIZE = "1000"                             # Maximum number of jobs in queue
+WORKER_COUNT = "3"                                  # Number of concurrent worker threads
+
+# Service metadata
+SERVICE_NAME = "background-jobs"
+VERSION = "1.0.0"
+
+# Security/Debug (NEVER enable DEBUG_MODE in production)
+DEBUG_MODE = "false"                                # Enable verbose logging with sensitive data
+
+# Secrets configuration:
+# Use telnyx-edge secrets add <name> <value> to add the following secrets:
+# - DATABASE_URL: External database connection string (if not using SQLite)
+# - REDIS_URL: Redis connection URL for distributed job queues
+# - API_KEY: External API key for job processing
+# - WEBHOOK_SECRET: Secret for webhook job notifications

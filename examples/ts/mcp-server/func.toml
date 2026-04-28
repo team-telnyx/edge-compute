@@ -1,0 +1,7 @@
+[edge_compute]
+func_id = "mcp-server-ts-demo"
+func_name = "mcp-server-ts"
+
+[env_vars]
+# TELNYX_API_KEY = "" # Set via: telnyx-edge secrets add TELNYX_API_KEY <key>
+# SHARED_SECRET = ""  # Set via: telnyx-edge secrets add SHARED_SECRET <secret>
