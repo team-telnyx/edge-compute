@@ -1,0 +1,31 @@
+[edge_compute]
+func_id = ""
+func_name = "webhook-receiver-python"
+
+[env_vars]
+# Webhook receiver configuration
+DATABASE_PATH = "/tmp/webhooks.db"                 # SQLite database path for webhook storage
+MAX_WEBHOOKS = "1000"                              # Maximum webhooks to store in memory
+WEBHOOK_RETENTION_HOURS = "24"                     # Hours to retain webhook logs
+
+# Service metadata
+SERVICE_NAME = "webhook-receiver"
+VERSION = "1.0.0"
+
+# Security/Debug (NEVER enable DEBUG_MODE in production)
+DEBUG_MODE = "false"                               # Enable verbose logging with sensitive data
+
+# Secrets configuration:
+# Use telnyx-edge secrets add <name> <value> to add the following secrets:
+# telnyx-edge secrets add WEBHOOK_RECEIVER_SECRET "your-secure-webhook-secret"
+# telnyx-edge secrets add API_KEY "your-api-key"
+# telnyx-edge secrets add NOTIFICATION_URL "https://your-notification-url.com"
+# telnyx-edge secrets add SLACK_WEBHOOK_URL "https://hooks.slack.com/services/..."
+
+# Required secrets:
+# - WEBHOOK_RECEIVER_SECRET: HMAC secret for webhook signature verification
+
+# Optional secrets:
+# - API_KEY: API key for webhook forwarding services
+# - NOTIFICATION_URL: URL for webhook failure notifications
+# - SLACK_WEBHOOK_URL: Slack webhook for alert notifications

@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# CSV Data Processor Test Script
+# Tests CSV processing, validation, batch operations, and async job management using enhanced test wrapper
+
+# Load shared test wrapper with rich educational features
+source "$(dirname "$0")/../../demo_wrapper.sh"
+
+start_section "📊 CSV Data Processing & Validation" "Complete data pipeline with batch processing and job management"
+
+# Test 1: API Documentation
+test_http_rich "GET" "/" "" "1️⃣ Get API Documentation" \
+    "Data processing APIs should provide clear documentation of supported formats and operations" \
+    "Self-documenting APIs help developers understand data formats, validation rules, and processing capabilities"
+
+# Test 2: Health Check
+test_http_rich "GET" "/health" "" "2️⃣ System Health Check" \
+    "Health endpoints ensure the data processing system is ready to handle requests" \
+    "Health checks are essential for monitoring data pipeline availability and system status"
+
+start_section "📋 Job Management & Tracking" "Testing async processing workflow and job lifecycle"
+
+# Test 3: Initial Jobs List (should be empty)
+test_http_rich "GET" "/jobs" "" "3️⃣ List Processing Jobs (Initial State)" \
+    "Verifying clean initial state before data processing begins" \
+    "Job tracking enables monitoring of long-running data processing tasks and batch operations"
+
+start_section "🔍 Data Validation & Processing" "Testing CSV parsing, validation, and transformation"
+
+# Test 4: Valid CSV Processing
+valid_csv='name,email,age
+John Doe,john@example.com,30
+Jane Smith,jane@example.com,25
+Bob Wilson,bob@example.com,35'
+
+test_http_rich "POST" "/process" "$valid_csv" "4️⃣ Process Valid CSV Data" \
+    "Testing CSV parsing and validation with well-formed data" \
+    "Successful CSV processing demonstrates data validation, parsing, and storage capabilities"
+
+# Test 5: CSV with Invalid Data
+invalid_csv='name,email,age
+John Doe,invalid-email,not-a-number
+Jane Smith,jane@example.com,25'
+
+test_http_rich "POST" "/process" "$invalid_csv" "5️⃣ Process CSV with Validation Errors" \
+    "Testing data validation and error handling for malformed records" \
+    "Robust validation prevents corrupted data from entering the system and provides clear error feedback"
+
+start_section "📈 Batch Processing & Scaling" "Testing large dataset handling and performance"
+
+# Test 6: Large Dataset Processing
+large_csv='name,email,age
+User1,user1@example.com,20
+User2,user2@example.com,25
+User3,user3@example.com,30
+User4,user4@example.com,35
+User5,user5@example.com,40
+User6,user6@example.com,45
+User7,user7@example.com,50
+User8,user8@example.com,55
+User9,user9@example.com,60
+User10,user10@example.com,65'
+
+test_http_rich "POST" "/process" "$large_csv" "6️⃣ Process Larger Dataset" \
+    "Testing batch processing capabilities with multiple records" \
+    "Batch processing enables efficient handling of large datasets while maintaining data quality and performance"
+
+start_section "🚫 Edge Cases & Error Handling" "Testing system resilience and error recovery"
+
+# Test 7: Empty CSV
+test_http_rich "POST" "/process" "" "7️⃣ Process Empty CSV" \
+    "Testing empty input handling and graceful error responses" \
+    "Proper handling of edge cases prevents system crashes and provides meaningful user feedback" \
+    "400" \
+    "400"
+
+# Test 8: CSV with Headers Only
+headers_only_csv='name,email,age'
+test_http_rich "POST" "/process" "$headers_only_csv" "8️⃣ Process CSV with Headers Only" \
+    "Testing minimal input validation and empty dataset handling" \
+    "Header-only CSV handling ensures the system can distinguish between valid structure and missing data"
+
+# Test 9: Malformed CSV Structure
+malformed_csv='name,email
+John Doe,john@example.com,30,extra_field
+Jane Smith'
+test_http_rich "POST" "/process" "$malformed_csv" "9️⃣ Process Malformed CSV Structure" \
+    "Testing CSV structural validation and inconsistent field handling" \
+    "Structural validation prevents data corruption from inconsistent CSV formats and field misalignment" \
+    "500"
+
+start_section "📊 Data Retrieval & Analytics" "Testing processed data access and job status monitoring"
+
+# Test 10: Final Jobs List (should show processing history)
+test_http_rich "GET" "/jobs" "" "🔟 List All Processing Jobs" \
+    "Reviewing complete job history and processing results" \
+    "Job history provides audit trails, performance metrics, and debugging information for data operations"
+
+# Test 11: Invalid Endpoint
+test_http_rich "GET" "/invalid" "" "1️⃣1️⃣ Test Invalid Endpoint" \
+    "Testing 404 error handling for undefined routes" \
+    "Proper error handling ensures clear feedback when accessing non-existent endpoints" \
+    404
+
+# Finish with comprehensive educational summary
+finish_tests_rich "
+• 📊 **CSV Data Processing**: Parse and validate structured data from various sources
+• 🔍 **Data Validation**: Implement field-level validation for emails, numbers, and required fields
+• 📋 **Job Management**: Track async processing tasks with status monitoring and history
+• 📈 **Batch Processing**: Handle large datasets efficiently with configurable batch sizes  
+• 🛡️ **Error Handling**: Graceful handling of malformed data, validation errors, and edge cases
+• 📊 **Data Analytics**: Process and analyze CSV data with configurable transformation rules
+• 🔄 **Async Operations**: Support long-running data processing tasks with job queuing
+• 🏗️ **Scalable Architecture**: Design patterns for high-volume data processing workloads
+• 📚 **Production Ready**: Includes input validation, error recovery, and audit logging
+• 🎯 **Extensible Design**: Framework for custom data transformation and validation rules
+"

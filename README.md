@@ -51,6 +51,39 @@ telnyx-edge ship
 telnyx-edge list
 ```
 
+## Start from an Example
+
+Clone a working example instead of starting from scratch:
+
+```bash
+# Browse examples
+ls examples/
+
+# Create a function from any example
+telnyx-edge new-func --from-dir=examples/ts/mcp-server --name=my-mcp-server
+cd my-mcp-server
+
+# Set secrets and deploy
+telnyx-edge secrets add TELNYX_API_KEY <your-api-key>
+telnyx-edge secrets add SHARED_SECRET "$(openssl rand -hex 32)"
+telnyx-edge ship
+```
+
+Available examples:
+
+| Example | Language | Description |
+|---------|----------|-------------|
+| [`ts/mcp-server`](examples/ts/mcp-server/) | TypeScript | MCP server — expose Telnyx API tools to AI agents |
+| [`js/mcp-server`](examples/js/mcp-server/) | JavaScript | MCP server (JS variant) |
+| [`ts/call-event-router`](examples/ts/call-event-router/) | TypeScript | Typed webhook event dispatcher |
+| [`js/webhook-receiver`](examples/js/webhook-receiver/) | JavaScript | Webhook ingestion with HMAC verification |
+| [`go/middleware-patterns`](examples/go/middleware-patterns/) | Go | HTTP middleware stack (logging, auth, CORS) |
+| [`python/restful-api`](examples/python/restful-api/) | Python | Full CRUD API with validation |
+| [`python/jwt-auth`](examples/python/jwt-auth/) | Python | JWT authentication with RBAC |
+| [`python/webhook-receiver`](examples/python/webhook-receiver/) | Python | Webhook processor with signature verification |
+
+See the [examples directory](examples/) for the full list with READMEs and demo scripts.
+
 ## Commands
 
 | Command | Description |

@@ -1,0 +1,35 @@
+[edge_compute]
+func_id = ""
+func_name = "test-processor"
+
+[env_vars]
+# Data processing configuration
+DATABASE_PATH = "/tmp/data_processor.db"           # SQLite database path
+BATCH_SIZE = "100"                                 # Records per batch (default: 100)
+MAX_FILE_SIZE = "10485760"                         # Max upload size in bytes (10MB)
+PROCESSING_TIMEOUT = "300"                         # Processing timeout in seconds
+
+# Service metadata
+SERVICE_NAME = "data-processor"
+VERSION = "1.0.0"
+
+# Security/Debug (NEVER enable DEBUG_MODE in production)
+DEBUG_MODE = "false"                               # Enable verbose logging with sensitive data
+DEBUG = "false"                                    # Legacy debug flag
+
+# Secrets configuration:
+# Use telnyx-edge secrets add <name> <value> to add the following secrets:
+# telnyx-edge secrets add DATABASE_URL "postgresql://user:pass@host:port/db"
+# telnyx-edge secrets add AWS_ACCESS_KEY_ID "your-aws-access-key"
+# telnyx-edge secrets add AWS_SECRET_ACCESS_KEY "your-aws-secret-key"
+# telnyx-edge secrets add ENCRYPTION_KEY "your-32-byte-encryption-key"
+
+# Required secrets:
+# - DATABASE_URL: External database connection string (recommended for production)
+
+# Optional secrets:
+# - AWS_ACCESS_KEY_ID: AWS access key for S3 storage
+# - AWS_SECRET_ACCESS_KEY: AWS secret key for S3 storage
+# - ENCRYPTION_KEY: 32-byte key for encrypting sensitive data
+# - API_KEY: API key for external data validation services
+# - NOTIFICATION_WEBHOOK: Webhook URL for processing completion notifications

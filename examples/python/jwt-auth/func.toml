@@ -1,0 +1,30 @@
+[edge_compute]
+func_id = "jwt-auth-python"
+func_name = "jwt-auth-python"
+
+[env_vars]
+# JWT configuration
+JWT_ALGORITHM = "HS256"                           # JWT algorithm (HS256, RS256, etc.)
+JWT_EXPIRY_MINUTES = "60"                         # Access token expiry in minutes
+JWT_REFRESH_EXPIRY_DAYS = "7"                     # Refresh token expiry in days
+ENVIRONMENT = "development"                       # Environment validation
+
+# Service metadata
+SERVICE_NAME = "jwt-auth"
+VERSION = "1.0.0"
+
+# Security/Debug (NEVER enable DEBUG_MODE in production)
+DEBUG_MODE = "false"                              # Enable verbose logging with sensitive data
+
+# Secrets configuration:
+# Use telnyx-edge secrets add <name> <value> to add the following secrets:
+# telnyx-edge secrets add JWT_SECRET "your-secure-jwt-secret-256-bits"
+
+# Required secrets:
+# - JWT_SECRET: 256-bit secret key for JWT token signing
+
+# Optional secrets:
+# - DATABASE_URL: External database connection for user storage
+# - REDIS_URL: Redis connection for token blacklisting
+# - OAUTH_CLIENT_ID: OAuth client ID for third-party authentication
+# - OAUTH_CLIENT_SECRET: OAuth client secret for third-party authentication
