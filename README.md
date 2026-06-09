@@ -96,6 +96,8 @@ See the [examples directory](examples/) for the full list with READMEs and demo 
 | `ship` | Deploy function to edge infrastructure |
 | `list` | List all deployed functions |
 | `delete-func` | Delete a function |
+| `revisions` | List a function's deploy history |
+| `rollback` | Instantly revert a function to a previous revision |
 | `secrets` | Manage secrets for your functions |
 | `bindings` | Manage Telnyx API key bindings |
 
@@ -152,6 +154,20 @@ telnyx-edge ship
 # Or specify the directory
 telnyx-edge ship --from-dir=./my-function
 ```
+
+## Rollback & Revisions
+
+Every successful `ship` creates an immutable revision. Inspect a function's deploy history and instantly revert to a previous revision — no rebuild or re-upload.
+
+```bash
+# List a function's recent revisions (newest first)
+telnyx-edge revisions list my-function
+
+# Roll back to a previous revision (instant traffic switch)
+telnyx-edge rollback my-function <revision-id>
+```
+
+`revisions list` shows each revision's id (a short image SHA), the ship author, timestamp, deploy status, and which revision is currently active. `rollback` switches the active revision to a previous one within seconds; a revision that never deployed successfully can't be a rollback target.
 
 ## Secrets Management
 
