@@ -35,13 +35,17 @@ telnyx-edge [global options] <command> [command options]
 | `list` | List your functions |
 | `secrets` | Manage secrets |
 | `bindings` | Manage Telnyx API key bindings |
-| `storage` | Manage storage resources (KV namespaces) |
+| `storage` | Manage storage resources (KV namespaces, SQL databases) |
+| `types` | Generate TypeScript types for your bindings |
 | `new-func` | Create a new function |
 | `ship` | Deploy function to edge |
 | `delete-func` | Delete a function |
 | `reset-func` | Reset a failed function back to `created` so it can be re-shipped |
 | `revisions` | List a function's deploy history |
 | `rollback` | Instantly revert a function to a previous revision |
+| `inspect` | Show a function's full details |
+| `actors` | Manage StatefulActor types |
+| `config` | View and change CLI preferences |
 
 **Flags**
 
@@ -65,16 +69,23 @@ cd hello-world
 # Deploy to edge
 telnyx-edge ship
 
-# Copy from existing example (advanced)
-telnyx-edge new-func --from-dir=examples/webhook-receiver --name=my-webhook
+# Start from code you already have (advanced)
+telnyx-edge new-func --from-dir=./my-existing-app --name=my-webhook
 telnyx-edge ship --from-dir=my-webhook
 
 # List your functions
 telnyx-edge list
 
-# Delete a function
+# Delete a function (asks for confirmation)
 telnyx-edge delete-func hello-world
+
+# ...or skip the prompt, for scripts and CI
+telnyx-edge delete-func hello-world --yes
 ```
+
+Destructive commands name what they are about to destroy and wait for you to type `yes` — the mistake worth catching is a wrong id, which a plain "are you sure?" would miss. Without a terminal they fail with an error naming `--yes` rather than prompting, so a pipeline never hangs on input that will not arrive.
+
+Stop being asked entirely with `TELNYX_EDGE_SKIP_CONFIRMATIONS=1` for a shell or CI job, or `telnyx-edge config set skip_confirmations true` permanently.
 
 ### **Revisions & Rollback**
 
@@ -178,6 +189,205 @@ Use `--ttl` to give a key a time-to-live; it is set when the value is written an
 
 Once a KV namespace is created, you can bind it to your functions and access it via the runtime API to store and retrieve data.
 
+### **SQL Databases**
+
+SQL databases give your functions a real SQLite database at the edge. Create a database, apply a schema, and bind it to a function — the function reaches it through `env.<BINDING>` with a familiar prepare/bind/query API.
+
+**Database management:**
+```bash
+# List all SQL databases
+telnyx-edge storage sqldb list
+
+# Create a new database
+telnyx-edge storage sqldb create --name my-app-db
+
+# Get details of a specific database
+telnyx-edge storage sqldb get <database-id>
+
+# Delete a database
+telnyx-edge storage sqldb delete <database-id>
+```
+
+A database is ready to use as soon as it reports `provision_ok` — there is no server to size and nothing to deploy per database.
+
+**Running SQL:**
+```bash
+# Run a statement directly against the database
+telnyx-edge storage sqldb execute <database-id> --remote \
+  --command "CREATE TABLE links (id INTEGER PRIMARY KEY, url TEXT NOT NULL)"
+
+# Run a .sql file (schema, seed data, an import)
+telnyx-edge storage sqldb execute <database-id> --remote --file ./schema.sql
+
+# Machine-readable results
+telnyx-edge storage sqldb execute <database-id> --remote \
+  --command "SELECT * FROM links" --json
+```
+
+`execute` runs SQL out-of-band, so you can bootstrap a schema before writing a single line of function code.
+
+**Migrations:**
+```bash
+# Create a numbered migration file
+telnyx-edge storage sqldb migrations create <database-id> add_links_table
+
+# See what is applied and what is pending
+telnyx-edge storage sqldb migrations list <database-id> --remote
+
+# Apply everything pending, in order
+telnyx-edge storage sqldb migrations apply <database-id> --remote
+```
+
+Migration files live in `migrations/<database>/` with an auto-incrementing numeric prefix. Applied migrations are recorded inside the database itself, so `apply` is safe to re-run — it only applies what is still pending.
+
+**Binding a database to a function** — add the block to your function's manifest (`func.toml`, or `telnyx.toml` if your project uses one):
+```toml
+[storage.sqldb.DB]
+id = "<database-id>"
+```
+
+Every function bound to the same id shares one database.
+
+Then use the database from your function:
+
+```ts
+import { env } from "@telnyx/edge-runtime";
+
+// One statement, no results.
+await env.DB.exec(
+  "CREATE TABLE IF NOT EXISTS links (id INTEGER PRIMARY KEY, url TEXT NOT NULL)",
+);
+
+// Bind values instead of concatenating them into the SQL.
+await env.DB.prepare("INSERT INTO links (url) VALUES (?)").bind(url).run();
+
+// .all() returns every row; .first() returns one value or row.
+const { results } = await env.DB.prepare("SELECT id, url FROM links ORDER BY id").all();
+const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM links").first<number>("n");
+```
+
+Bindings are read from the `env` object exported by `@telnyx/edge-runtime`, so `import` it as shown above. `env.DB` requires `@telnyx/edge-runtime` **0.9.0 or newer**.
+
+Run [`telnyx-edge types`](#typed-bindings) to give `env.DB` its real type.
+
+### **Typed Bindings**
+
+Every binding you declare is reachable in TypeScript as `env.<BINDING>`. `telnyx-edge types` reads your manifest and writes a `telnyx-env.d.ts` at the project root giving each one its real type:
+
+```bash
+telnyx-edge types
+```
+
+```text
+✓ Generated binding types for 2 binding(s) at telnyx-env.d.ts
+    env.DB → SqlDatabase
+    env.CACHE → KvNamespace
+```
+
+With that file in place, `env.DB` autocompletes with the full query API and a misspelled or undeclared binding fails to compile instead of surfacing as `undefined` at runtime.
+
+```ts
+import { env } from "@telnyx/edge-runtime";
+
+const { results } = await env.DB.prepare("SELECT id FROM links").all();
+await env.CACHE.put("last-run", new Date().toISOString());
+
+env.TYPOED_NAME;  // compile error — not a declared binding
+```
+
+Re-run it whenever you add, rename, or remove a binding. It reads only your local manifest — no network, no authentication — so it is safe to run in a build script or a pre-commit hook.
+
+Binding types require a recent `@telnyx/edge-runtime`; `types` checks the installed version and tells you which one a given binding needs.
+
+### **StatefulActors**
+
+A StatefulActor is a named, addressable object that owns its state. Each instance is identified by a name you choose, and the platform guarantees there is **one** live instance per name — so calls to the same name are serialized and never race. It is the right tool when a piece of state has a natural identity: one room, one session, one tenant, one document.
+
+Actors are TypeScript-only and declared in a `telnyx.toml` manifest:
+
+```toml
+name = "chat"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+[[actors]]
+binding = "ROOM"     # how your code reaches it
+type    = "ChatRoom" # the exported class name
+```
+
+Scaffold a project with the actor wiring already in place:
+
+```bash
+telnyx-edge new-func --actor --name chat
+```
+
+Your module exports both the actor class and the HTTP handler:
+
+```ts
+import { ChatRoom } from "./chat-room.js";
+export { ChatRoom };            // registers the class with the runtime
+
+export default {
+  async fetch(req: Request, env: Env): Promise<Response> {
+    // Address an instance by name — same name, same instance, every time.
+    const room = env.ROOM.idFromName("general");
+    const messages = await room.history();
+    return Response.json({ messages });
+  },
+};
+```
+
+Extend `StatefulActor` to get `this.ctx`. `ctx.storage` is that instance's private state — a key/value API, plus `ctx.storage.sql` for a full SQLite database belonging to that one instance. `sql.exec(...)` takes the statement and its bind parameters and returns a cursor; call `.toArray()` for the rows:
+
+```ts
+import { StatefulActor } from "@telnyx/edge-runtime";
+
+type Message = { id: number; body: string };
+
+export class ChatRoom extends StatefulActor {
+  async post(body: string) {
+    this.ctx.storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT)",
+    );
+    this.ctx.storage.sql.exec("INSERT INTO messages (body) VALUES (?)", body);
+  }
+
+  async history(): Promise<Message[]> {
+    return this.ctx.storage.sql
+      .exec<Message>("SELECT id, body FROM messages ORDER BY id")
+      .toArray();
+  }
+}
+```
+
+Writes are acknowledged only once they are durable, and an instance rehydrates its database when it next activates — so state survives the pod being replaced.
+
+**Managing deployed actor types:**
+```bash
+# List the actor types in your account
+telnyx-edge actors list
+
+# Inspect one type
+telnyx-edge actors inspect ChatRoom
+
+# Delete a type and its instances
+telnyx-edge actors delete ChatRoom
+```
+
+`telnyx-edge inspect <function>` shows every binding a function declares — actors, SQL databases, KV namespaces and secrets — alongside its other details. Each row gives the `env.<NAME>` handle, the kind of binding, what it targets, and its status.
+
+**`ctx.storage.sql` is not the same thing as a SQL database.** Both give you SQLite, and the difference is ownership:
+
+| | `ctx.storage.sql` | `storage sqldb` |
+|---|---|---|
+| belongs to | one actor instance | your account |
+| created by | existing — activate an instance | `telnyx-edge storage sqldb create` |
+| reached with | `ctx.storage.sql` inside the class | `env.DB` from any bound function |
+| shared between functions | no | yes |
+| CLI access | none | `execute`, `migrations` |
+
+Use `ctx.storage.sql` when the data belongs to one entity and nothing else should touch it. Use a SQL database when several functions query the same data.
+
 ---
 
 ## 📦 Installation
@@ -238,11 +448,10 @@ The CLI checks once a day for a newer release and prints an upgrade notice to st
 
 ## 📖 Documentation
 
-- [📚 Complete Documentation](docs/overview.md) - Full guide for getting started and advanced usage
+- [📚 Complete Documentation](https://developers.telnyx.com/docs/edge-compute) - Full guide for getting started and advanced usage
 
 ---
 
 ## 🆘 Support
 
-- Issues: [GitHub Issues](https://github.com/team-telnyx/edge-compute-cli/issues)
-- Discussions: [GitHub Discussions](https://github.com/team-telnyx/edge-compute-cli/discussions)
+- Issues: [GitHub Issues](https://github.com/team-telnyx/edge-compute/issues)
