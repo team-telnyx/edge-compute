@@ -101,6 +101,20 @@ telnyx-edge rollback my-func <revision-id>
 
 `revisions list` shows each revision's id (a short image SHA), the ship author, timestamp, deploy status, and which revision is currently active. `rollback` switches the active revision to an existing one within seconds; a revision that never reached a healthy deploy cannot be a rollback target.
 
+### **Why a Ship Failed**
+
+When a `ship` fails, `ship status` tells you *why* — classified by where it failed — so you don't have to read the raw build log.
+
+```bash
+# One actionable line: the failure reason (or ✅ if the last ship succeeded)
+telnyx-edge ship status my-func
+
+# Add the build-log snippet for a build failure
+telnyx-edge ship status my-func --logs
+```
+
+The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy**, **platform**, or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
+
 ### **Resetting a Failed Function**
 
 If a function gets stuck in a failed state (`build_failed`, `deploy_failed`, or `delete_failed`), `reset-func` tears down its deployed resources and returns it to `created` — **without changing the function's id, name, or config** — so you can fix the issue and re-`ship` it.
