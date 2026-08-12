@@ -87,6 +87,22 @@ Destructive commands name what they are about to destroy and wait for you to typ
 
 Stop being asked entirely with `TELNYX_EDGE_SKIP_CONFIRMATIONS=1` for a shell or CI job, or `telnyx-edge config set skip_confirmations true` permanently.
 
+### **Project shape**
+
+Your manifest picks how the project is built, so `ship` checks the entrypoint agrees before uploading anything.
+
+A **`func.toml`** project is built by the buildpack and starts its own HTTP server. A **`telnyx.toml`** project is served by the Telnyx function runtime and exports a handler:
+
+```ts
+export default {
+  async fetch(request: Request): Promise<Response> {
+    return Response.json({ ok: true });
+  },
+};
+```
+
+That handler in a `func.toml` project fails locally with the fix named: the container would export the object, exit, and the deploy would time out. Either rename the manifest to `telnyx.toml` and add `main` and `compatibility_date`, or start a server and reach bindings with `import { env } from "@telnyx/edge-runtime"`. The reverse pairing is only a warning, and the check stays quiet whenever it cannot tell — it never fails a ship on a guess.
+
 ### **Revisions & Rollback**
 
 Every successful `ship` creates an immutable revision. Inspect a function's deploy history and instantly revert to a previous revision — no rebuild or re-upload required.
@@ -233,12 +249,18 @@ telnyx-edge storage sqldb execute <database-id> --remote \
 # Run a .sql file (schema, seed data, an import)
 telnyx-edge storage sqldb execute <database-id> --remote --file ./schema.sql
 
+# Bind values instead of writing them into the SQL
+telnyx-edge storage sqldb execute <database-id> --remote \
+  --command "SELECT * FROM links WHERE url = ?" --param "https://example.com"
+
 # Machine-readable results
 telnyx-edge storage sqldb execute <database-id> --remote \
   --command "SELECT * FROM links" --json
 ```
 
 `execute` runs SQL out-of-band, so you can bootstrap a schema before writing a single line of function code.
+
+`--param` binds a value to the next `?` placeholder and is repeatable; values fill the placeholders left to right, in the order the flags appear. It always sends a string — use `--param-json` for a number, boolean, or null (`--param-json 42`, `--param-json true`, `--param-json null`), since a shell cannot otherwise express the difference between `42` and `"42"`. The number of values must match the number of placeholders. Bind anything that came from outside your own script this way rather than pasting it into the statement.
 
 **Migrations:**
 ```bash
