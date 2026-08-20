@@ -125,11 +125,11 @@ When a `ship` fails, `ship status` tells you *why* — classified by where it fa
 # One actionable line: the failure reason (or ✅ if the last ship succeeded)
 telnyx-edge ship status my-func
 
-# Add the build-log snippet for a build failure
+# Add the build log or crash output, when the platform sent one
 telnyx-edge ship status my-func --logs
 ```
 
-The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy**, **platform**, or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
+The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy** failure shows why — e.g. the function crashed on startup (with its own crash output under `--logs`) or never became ready; a **platform** or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
 
 ### **Resetting a Failed Function**
 
@@ -168,6 +168,29 @@ telnyx-edge bindings delete
 ```
 
 Once a binding is created, your functions automatically receive `TELNYX_API_KEY` and `TELNYX_BASE_URL` environment variables, allowing seamless use of the Telnyx SDK.
+
+### **Custom Domains**
+
+Custom domains let you route your own hostname to an edge compute function over HTTPS. You verify DNS ownership with a TXT record, then upload a TLS certificate to enable HTTPS routing.
+
+```bash
+# Add a custom domain mapping (returns a verification token and TXT record instructions)
+telnyx-edge domains add api.example.com <function_id>
+
+# Verify domain ownership — checks DNS for a TXT record at _telnyx-verification.<hostname>
+telnyx-edge domains verify api.example.com
+
+# List all custom domains for your organization
+telnyx-edge domains list
+
+# Upload a TLS certificate (PEM-encoded cert + key) to enable HTTPS routing
+telnyx-edge domains cert upload api.example.com --cert cert.pem --key key.pem
+
+# Delete a custom domain mapping and its associated routing
+telnyx-edge domains delete api.example.com
+```
+
+**Flow:** `domains add` → add the TXT record → `domains verify` → `domains cert upload` → HTTPS routing is live.
 
 ### **KV Storage (Key-Value Storage)**
 
