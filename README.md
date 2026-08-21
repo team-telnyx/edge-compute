@@ -131,6 +131,32 @@ telnyx-edge ship status my-func --logs
 
 The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy** failure shows why — e.g. the function crashed on startup (with its own crash output under `--logs`) or never became ready; a **platform** or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
 
+### **Runtime Logs**
+
+Once a function is deployed, `tail` shows what it actually printed — the `console.log` and error output from your own code.
+
+```bash
+# The last hour of output, up to 100 lines
+telnyx-edge tail my-func
+
+# Narrow the window
+telnyx-edge tail my-func --since 10m
+
+# More lines, or machine-readable output
+telnyx-edge tail my-func -n 200
+telnyx-edge tail my-func --json | jq -r '.data[].message'
+```
+
+Each line prints as `[timestamp] [level] message`, oldest first. `--since` (default `1h`, max `24h`) chooses the window; `-n` (default `100`, max `250`) caps how many lines are shown. Values above the maximum are clamped, not rejected.
+
+Three things worth knowing:
+
+- **Logs are not live.** A line reaches the platform a few seconds after your function writes it — make a request, wait a moment, then run `tail`.
+- **`level` is best-effort** and is often wrong on stack traces, so don't use it to decide whether something failed.
+- **A multi-line message arrives as several lines.** A stack trace is not grouped into one entry.
+
+If logs could not be read from every location your function runs in, `tail` says so on stderr rather than quietly returning a partial answer.
+
 ### **Resetting a Failed Function**
 
 If a function gets stuck in a failed state (`build_failed`, `deploy_failed`, or `delete_failed`), `reset-func` tears down its deployed resources and returns it to `created` — **without changing the function's id, name, or config** — so you can fix the issue and re-`ship` it.
