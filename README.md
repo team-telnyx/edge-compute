@@ -131,6 +131,32 @@ telnyx-edge ship status my-func --logs
 
 The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy** failure shows why — e.g. the function crashed on startup (with its own crash output under `--logs`) or never became ready; a **platform** or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
 
+### **Runtime Logs**
+
+Once a function is deployed, `logs` shows what it actually printed — the `console.log` and error output from your own code.
+
+```bash
+# The last hour of output, up to 50 lines
+telnyx-edge logs my-func
+
+# Narrow the window
+telnyx-edge logs my-func --since 10m
+
+# More lines, or machine-readable output
+telnyx-edge logs my-func --last 200
+telnyx-edge logs my-func --json | jq -r '.data[].message'
+```
+
+Each line prints as `[timestamp] [level] message`, oldest first. `--since` (default `1h`, max `24h`) chooses the window; `--last` (default `50`, max `250`) caps how many lines are shown. Values above the maximum are clamped, not rejected.
+
+Three things worth knowing:
+
+- **Logs are not live.** A line reaches the platform a few seconds after your function writes it — make a request, wait a moment, then run `logs`.
+- **`level` is best-effort** and is often wrong on stack traces, so don't use it to decide whether something failed.
+- **A multi-line message arrives as several lines.** A stack trace is not grouped into one entry.
+
+If logs could not be read from every location your function runs in, `logs` says so on stderr rather than quietly returning a partial answer.
+
 ### **Resetting a Failed Function**
 
 If a function gets stuck in a failed state (`build_failed`, `deploy_failed`, or `delete_failed`), `reset-func` tears down its deployed resources and returns it to `created` — **without changing the function's id, name, or config** — so you can fix the issue and re-`ship` it.
@@ -298,6 +324,32 @@ telnyx-edge storage sqldb migrations apply <database-id> --remote
 ```
 
 Migration files live in `migrations/<database>/` with an auto-incrementing numeric prefix. Applied migrations are recorded inside the database itself, so `apply` is safe to re-run — it only applies what is still pending.
+
+**Exporting:**
+```bash
+# Everything: schema and data
+telnyx-edge storage sqldb export <database-id> --remote --output ./database.sql
+
+# One table, or several — --table is repeatable
+telnyx-edge storage sqldb export <database-id> --remote --table links --output ./links.sql
+telnyx-edge storage sqldb export <database-id> --remote --table links --table clicks --output ./subset.sql
+
+# Schema only, or data only
+telnyx-edge storage sqldb export <database-id> --remote --no-data --output ./schema.sql
+telnyx-edge storage sqldb export <database-id> --remote --no-schema --output ./data.sql
+
+# Copy one database into another
+telnyx-edge storage sqldb export <source-id> --remote --output - \
+  | telnyx-edge storage sqldb execute <target-id> --remote --file -
+```
+
+`export` writes the database out as SQL text — `CREATE` statements, then `INSERT` statements, then the indexes, views and triggers — and the result re-imports with `execute --file`. That makes it the way to take a backup, move a database between environments, or just read what is actually stored. `--output` is required; `-` writes to stdout so the dump can be piped. The file is written in full and then moved into place, so an interrupted export never overwrites a previous backup with a partial one. On macOS and Linux it is created readable only by you, since a dump is every row of your database in plaintext — on Windows, file permissions are left to the directory you write into.
+
+Values keep their exact type on the way out and back: integers too large for a JSON number, full-precision floats, BLOBs and text that is not valid UTF-8 all re-import as what they were. `AUTOINCREMENT` counters are restored too, so a re-imported database will not re-issue a row id the original had already used.
+
+An export is a job: the command queues it, waits, then downloads the result. The dump is written to your own Telnyx cloud storage and fetched from there — nothing extra to configure, since the CLI uses the credentials you are already signed in with, and the copy in your bucket is cleaned up once the download window closes.
+
+Databases containing virtual tables (for example FTS5) cannot be exported, because their contents live in shadow tables that do not round-trip; the export refuses rather than writing a file that would fail on import. An export is also not a point-in-time snapshot: a write committed while it runs may be partially reflected.
 
 **Binding a database to a function** — add the block to your function's manifest (`func.toml`, or `telnyx.toml` if your project uses one):
 ```toml
