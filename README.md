@@ -44,6 +44,7 @@ telnyx-edge [global options] <command> [command options]
 | `revisions` | List a function's deploy history |
 | `rollback` | Instantly revert a function to a previous revision |
 | `inspect` | Show a function's full details |
+| `metrics` | Show a function's recent request and resource metrics |
 | `actors` | Manage StatefulActor types |
 | `config` | View and change CLI preferences |
 
@@ -108,14 +109,14 @@ That handler in a `func.toml` project fails locally with the fix named: the cont
 Every successful `ship` creates an immutable revision. Inspect a function's deploy history and instantly revert to a previous revision — no rebuild or re-upload required.
 
 ```bash
-# List a function's recent revisions (newest first)
-telnyx-edge revisions list my-func
+# Show a function's recent deploys, and why any of them failed (newest first)
+telnyx-edge deployments my-func
 
 # Roll back to a previous revision (instant traffic switch)
 telnyx-edge rollback my-func <revision-id>
 ```
 
-`revisions list` shows each revision's id (a short image SHA), the ship author, timestamp, deploy status, and which revision is currently active. `rollback` switches the active revision to an existing one within seconds; a revision that never reached a healthy deploy cannot be a rollback target.
+`deployments` prints one row per ship: the revision id (a short image SHA), the author, timestamp, outcome, build duration, which revision is currently active, the commit, and — for a ship that failed — the stage it failed at and the reason, as columns on that ship's own row. A long reason is shortened with `…` to keep the table readable; `--json` gives you the full text. `rollback` switches the active revision to an existing one within seconds; a ship that never reached a healthy deploy cannot be a rollback target, and one whose build failed has no revision id at all.
 
 ### **Why a Ship Failed**
 
@@ -131,13 +132,16 @@ telnyx-edge ship status my-func --logs
 
 The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy** failure shows why — e.g. the function crashed on startup (with its own crash output under `--logs`) or never became ready; a **platform** or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
 
-### **Runtime Logs**
+### **Logs**
 
-Once a function is deployed, `logs` shows what it actually printed — the `console.log` and error output from your own code.
+Once a function is deployed, `logs` shows either what it printed or the traffic it served.
 
 ```bash
-# The last hour of output, up to 50 lines
+# The last hour of runtime output (console.log/error), up to 50 lines
 telnyx-edge logs my-func
+
+# One line per HTTP request served, emitted by the platform
+telnyx-edge logs my-func --type invocations
 
 # Narrow the window
 telnyx-edge logs my-func --since 10m
@@ -147,15 +151,35 @@ telnyx-edge logs my-func --last 200
 telnyx-edge logs my-func --json | jq -r '.data[].message'
 ```
 
-Each line prints as `[timestamp] [level] message`, oldest first. `--since` (default `1h`, max `24h`) chooses the window; `--last` (default `50`, max `250`) caps how many lines are shown. Values above the maximum are clamped, not rejected.
+`--type` picks the stream: `runtime` (default) is your code's own output; `invocations` is one record per request, so it reports traffic even for a function that logs nothing. Runtime lines print as `[timestamp] [level] message`; invocation lines print as `[timestamp] method status_code <duration>ms`. Both are oldest first. `--since` (default `1h`, max `24h`) chooses the window; `--last` (default `50`, max `250`) caps how many lines are shown. Values above the maximum are clamped, not rejected.
 
 Three things worth knowing:
 
-- **Logs are not live.** A line reaches the platform a few seconds after your function writes it — make a request, wait a moment, then run `logs`.
-- **`level` is best-effort** and is often wrong on stack traces, so don't use it to decide whether something failed.
+- **Logs are not live.** A line reaches the platform a few seconds after your function writes it or serves a request — make a request, wait a moment, then run `logs`.
+- **`level` is best-effort** (runtime logs only) and is often wrong on stack traces, so don't use it to decide whether something failed.
 - **A multi-line message arrives as several lines.** A stack trace is not grouped into one entry.
 
 If logs could not be read from every location your function runs in, `logs` says so on stderr rather than quietly returning a partial answer.
+
+### **Metrics**
+
+Use `metrics` to summarize recent traffic and resource usage for a deployed function.
+
+```bash
+# Last 24 hours
+telnyx-edge metrics my-func
+
+# Narrow the window
+telnyx-edge metrics my-func --since 6h
+
+# Focus on HTTP 5xx errors
+telnyx-edge metrics my-func --errors
+
+# Machine-readable aggregate response
+telnyx-edge metrics my-func --json
+```
+
+The command accepts a function name or id. `--since` defaults to `24h` and accepts Go durations such as `10m`, `2h`, or `168h`; the maximum is 168 hours. The summary includes request counts, HTTP 2xx/4xx/5xx rates, latency percentiles, average request latency, CPU usage, and memory usage. Detailed exception categories, top error messages, duration GB-s totals, and outbound fetch metrics are not available from the function metrics API yet.
 
 ### **Resetting a Failed Function**
 
