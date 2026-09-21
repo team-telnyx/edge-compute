@@ -161,6 +161,26 @@ Three things worth knowing:
 
 If logs could not be read from every location your function runs in, `logs` says so on stderr rather than quietly returning a partial answer.
 
+### **Log Export**
+
+`log-export` pushes a function's runtime and/or invocation logs to an external OTLP endpoint (Honeycomb, Datadog, Grafana, your own collector, ...) as they happen, instead of only being readable via `logs`.
+
+```bash
+# Push both runtime and invocation logs to an OTLP endpoint, attaching an auth header your collector expects
+telnyx-edge log-export set my-func --endpoint https://api.honeycomb.io/v1/logs --header x-honeycomb-team=abc123
+
+# Push only invocation logs (one record per HTTP request)
+telnyx-edge log-export set my-func --endpoint https://api.honeycomb.io/v1/logs --invocations
+
+# Show the current destination and which types are exported
+telnyx-edge log-export get my-func
+
+# Stop exporting
+telnyx-edge log-export delete my-func
+```
+
+`set` replaces any existing destination for the function. `--runtime`/`--invocations` pick which types go to it: naming neither exports both (the default, same as before these flags existed); naming just one exports only that type. `--header` may be repeated to attach multiple headers to every push. Headers are encrypted at rest and never shown back — `get` only reports the endpoint and which log types are exported. `delete` is idempotent: it succeeds even if nothing was configured.
+
 ### **Metrics**
 
 Use `metrics` to summarize recent traffic and resource usage for a deployed function.
