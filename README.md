@@ -104,6 +104,14 @@ export default {
 
 That handler in a `func.toml` project fails locally with the fix named: the container would export the object, exit, and the deploy would time out. Either rename the manifest to `telnyx.toml` and add `main` and `compatibility_date`, or start a server and reach bindings with `import { env } from "@telnyx/edge-runtime"`. The reverse pairing is only a warning, and the check stays quiet whenever it cannot tell — it never fails a ship on a guess.
 
+`ship` also warns when your code reaches a StatefulActor your manifest does not declare:
+
+```text
+⚠️  src/rooms.ts:4 calls `env.ROOM.idFromName(…)`, but no [[actors]] block in telnyx.toml declares the binding `ROOM`.
+```
+
+That combination is worth catching early because nothing downstream reports it: `env` is built from the manifest, so an undeclared `env.ROOM` is simply `undefined` and only throws on the code path that uses it. The build succeeds, the deploy succeeds, and the health check and your plain-HTTP routes all keep answering — while a WebSocket upgrade handed to the actor comes back as a bare `500`. For a `telnyx.toml` project the whole bundled module graph is checked, so a call in any file that ships is found; a `func.toml` project uploads its sources unbundled, so only its entrypoint is read. It is always a warning and never blocks a ship.
+
 ### **Revisions & Rollback**
 
 Every successful `ship` creates an immutable revision. Inspect a function's deploy history and instantly revert to a previous revision — no rebuild or re-upload required.
@@ -149,13 +157,20 @@ telnyx-edge logs my-func --since 10m
 # More lines, or machine-readable output
 telnyx-edge logs my-func --last 200
 telnyx-edge logs my-func --json | jq -r '.data[].message'
+
+# Watch new lines as they happen, until Ctrl-C
+telnyx-edge logs my-func --tail
 ```
 
 `--type` picks the stream: `runtime` (default) is your code's own output; `invocations` is one record per request, so it reports traffic even for a function that logs nothing. Runtime lines print as `[timestamp] [level] message`; invocation lines print as `[timestamp] method status_code <duration>ms`. Both are oldest first. `--since` (default `1h`, max `24h`) chooses the window; `--last` (default `50`, max `250`) caps how many lines are shown. Values above the maximum are clamped, not rejected.
 
+**`--tail` watches instead of reading history.** It stays attached and prints lines as they arrive, until you press Ctrl-C. With no `--type` it shows both streams interleaved — your output and one line per request — which is the difference from the default mode, where no `--type` means `runtime`. `--since` and `--last` do nothing here, since there is no history to page through; `--json` prints one object per line rather than a single array, because the stream has no end. A dropped connection reconnects on its own; an authentication failure or a missing function stops instead of retrying.
+
+Tail is best-effort and carries no history: it shows what arrives while you are attached, and nothing from before. Use `logs` without `--tail` when you need the persisted record.
+
 Three things worth knowing:
 
-- **Logs are not live.** A line reaches the platform a few seconds after your function writes it or serves a request — make a request, wait a moment, then run `logs`.
+- **Logs are not live by default.** A line reaches the platform a few seconds after your function writes it or serves a request — make a request, wait a moment, then run `logs`. Use `--tail` to watch them arrive instead.
 - **`level` is best-effort** (runtime logs only) and is often wrong on stack traces, so don't use it to decide whether something failed.
 - **A multi-line message arrives as several lines.** A stack trace is not grouped into one entry.
 
