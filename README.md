@@ -46,6 +46,7 @@ telnyx-edge [global options] <command> [command options]
 | `inspect` | Show a function's full details |
 | `metrics` | Show a function's recent request and resource metrics |
 | `actors` | Manage StatefulActor types |
+| `dev` | Run a `telnyx.toml` project locally (function + actors) |
 | `config` | View and change CLI preferences |
 
 **Flags**
@@ -540,9 +541,41 @@ telnyx-edge actors list
 # Inspect one type
 telnyx-edge actors inspect ChatRoom
 
+# List a type's persisted instances (metadata only, no stored values)
+telnyx-edge actors instances ChatRoom
+
+# Recent request and resource metrics for a type
+telnyx-edge actors metrics ChatRoom
+
+# Recent runtime (console.log) and invocation logs for a type, interleaved by time
+telnyx-edge actors logs ChatRoom
+
+# --type narrows to just one stream
+telnyx-edge actors logs ChatRoom --type invocations
+
 # Delete a type and its instances
 telnyx-edge actors delete ChatRoom
 ```
+
+**Running a project locally:**
+
+`telnyx-edge dev` runs a `telnyx.toml` project on your machine — your function and its StatefulActors — so you can try changes without shipping. It needs Docker with Compose v2.
+
+```bash
+# Run the project in the current directory; edits reload automatically (Ctrl-C stops watching)
+telnyx-edge dev
+
+# Boot and return, for scripts and CI
+telnyx-edge dev --no-watch
+
+# Stop it, or stop it and delete the local state
+docker compose -f .telnyx/dev/compose.yaml down
+docker compose -f .telnyx/dev/compose.yaml down -v
+```
+
+Your function is served at `http://127.0.0.1:8787` (`--port` changes it). The first run downloads the runtime images (about 1 GB).
+
+What works locally: `[[actors]]`, including `ctx.storage` (key-value and SQL) and alarms, and your function's `[env_vars]` in `process.env`. Local state persists between runs until you `down -v`. `[[secrets]]`, `[telnyx]`, `[storage.*]` and `[[ratelimits]]` are not available locally yet: `dev` lists the ones your project declares when it starts, and they are `undefined` in your code. `dev` writes its files under `.telnyx/`; add that to your `.gitignore`.
 
 `telnyx-edge inspect <function>` shows every binding a function declares — actors, SQL databases, KV namespaces and secrets — alongside its other details. Each row gives the `env.<NAME>` handle, the kind of binding, what it targets, and its status.
 
