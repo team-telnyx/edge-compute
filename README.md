@@ -544,7 +544,9 @@ telnyx-edge actors inspect ChatRoom
 # List a type's persisted instances (metadata only, no stored values)
 telnyx-edge actors instances ChatRoom
 
-# Recent request and resource metrics for a type
+# Recent request, resource, and storage metrics for a type (storage is the type's
+# total ctx.storage.sql size across all instances, not any one instance's size).
+# --since maxes out at 90h here, not the 168h of the root `metrics` command.
 telnyx-edge actors metrics ChatRoom
 
 # Recent runtime (console.log) and invocation logs for a type, interleaved by time
