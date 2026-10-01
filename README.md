@@ -561,7 +561,7 @@ telnyx-edge actors delete ChatRoom
 
 **Running a project locally:**
 
-`telnyx-edge dev` runs a `telnyx.toml` project on your machine — your function and its StatefulActors — so you can try changes without shipping. It needs Docker with Compose v2.
+`telnyx-edge dev` runs a `telnyx.toml` project on your machine — your function and its StatefulActors — so you can try changes without shipping. It needs Docker with Compose v2.17 or later.
 
 ```bash
 # Run the project in the current directory; edits reload automatically (Ctrl-C stops watching)
@@ -574,6 +574,8 @@ telnyx-edge dev --no-watch
 docker compose -f .telnyx/dev/compose.yaml down
 docker compose -f .telnyx/dev/compose.yaml down -v
 ```
+
+To restart the stack, re-run the same `telnyx-edge dev` command: it recreates every container and keeps your local state. Restarting the function or actor container on its own (`docker compose restart function-runtime`, or `docker restart`) also works.
 
 Your function is served at `http://127.0.0.1:8787` (`--port` changes it). The first run downloads the runtime images (about 1 GB).
 
