@@ -75,6 +75,9 @@ telnyx-edge ship
 telnyx-edge new-func --from-dir=./my-existing-app --name=my-webhook
 telnyx-edge ship --from-dir=my-webhook
 
+# Give a slow build even more room than the 30m default
+telnyx-edge ship --timeout=45m
+
 # List your functions
 telnyx-edge list
 
@@ -84,6 +87,8 @@ telnyx-edge delete-func hello-world
 # ...or skip the prompt, for scripts and CI
 telnyx-edge delete-func hello-world --yes
 ```
+
+`ship` stays attached and reports each stage until the function is live, which is why an unqualified `ship` can sit there for a while: it waits up to 30 minutes before giving up. That is a monitoring limit, not a deploy limit — on timeout the deploy carries on server-side and `telnyx-edge ship status <func>` tells you how it ended. Pass `--timeout` to wait longer, or to cap the wait shorter for CI.
 
 Destructive commands name what they are about to destroy and wait for you to type `yes` — the mistake worth catching is a wrong id, which a plain "are you sure?" would miss. Without a terminal they fail with an error naming `--yes` rather than prompting, so a pipeline never hangs on input that will not arrive.
 
@@ -554,6 +559,9 @@ telnyx-edge actors logs ChatRoom
 
 # --type narrows to just one stream
 telnyx-edge actors logs ChatRoom --type invocations
+
+# Stay attached and stream new lines as they happen (Ctrl-C stops)
+telnyx-edge actors logs ChatRoom --tail
 
 # Delete a type and its instances
 telnyx-edge actors delete ChatRoom
