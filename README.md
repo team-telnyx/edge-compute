@@ -118,6 +118,8 @@ That handler in a `func.toml` project fails locally with the fix named: the cont
 
 That combination is worth catching early because nothing downstream reports it: `env` is built from the manifest, so an undeclared `env.ROOM` is simply `undefined` and only throws on the code path that uses it. The build succeeds, the deploy succeeds, and the health check and your plain-HTTP routes all keep answering — while a WebSocket upgrade handed to the actor comes back as a bare `500`. For a `telnyx.toml` project the whole bundled module graph is checked, so a call in any file that ships is found; a `func.toml` project uploads its sources unbundled, so only its entrypoint is read. It is always a warning and never blocks a ship.
 
+For `telnyx.toml` projects, `ship` asks before upload if its check detects an actor type whose owning function was deleted and whose class this bundle exports. Shipping makes this function the owner and redeploys the actor with this function's code and actor environment variables, preserving its state. Use `ship --yes` to confirm in scripts; otherwise a required confirmation fails without a terminal. The check is advisory and is skipped if the actor lookup fails. Non-fatal deployment-service warnings are printed after upload.
+
 ### **Revisions & Rollback**
 
 Every successful `ship` creates an immutable revision. Inspect a function's deploy history and instantly revert to a previous revision — no rebuild or re-upload required.
@@ -588,6 +590,8 @@ To restart the stack, re-run the same `telnyx-edge dev` command: it recreates ev
 Your function is served at `http://127.0.0.1:8787` (`--port` changes it). The first run downloads the runtime images (about 1 GB).
 
 What works locally: `[[actors]]`, including `ctx.storage` (key-value and SQL) and alarms, and your function's `[env_vars]` in `process.env`. Local state persists between runs until you `down -v`. `[[secrets]]`, `[telnyx]`, `[storage.*]` and `[[ratelimits]]` are not available locally yet: `dev` lists the ones your project declares when it starts, and they are `undefined` in your code. `dev` writes its files under `.telnyx/`; add that to your `.gitignore`.
+
+In `telnyx.toml`, environment variables can also use `[env_vars.shared]`, `[env_vars.function]`, `[env_vars.actor]`, and per-actor `env_vars` tables. Values must be strings. The function resolves shared, flat, then function-specific values; each actor type resolves shared, actor-wide, then per-type values. Unknown scopes fail validation; conflicting flat and function-specific values warn, with the function-specific value winning. Local `dev` applies the resolved function values but does not inject actor-scoped values into actor runtimes yet; it reports affected types as unavailable locally. Keep secrets out of these tables.
 
 `telnyx-edge inspect <function>` shows every binding a function declares — actors, SQL databases, KV namespaces and secrets — alongside its other details. Each row gives the `env.<NAME>` handle, the kind of binding, what it targets, and its status.
 
