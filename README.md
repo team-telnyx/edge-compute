@@ -376,6 +376,19 @@ telnyx-edge storage sqldb execute <database-id> --remote \
 
 `execute` runs SQL out-of-band, so you can bootstrap a schema before writing a single line of function code.
 
+**Local databases (`--local`):**
+```bash
+# Same commands, against a database file on this machine instead of the deployed one
+telnyx-edge storage sqldb execute DB --local \
+  --command "CREATE TABLE links (id INTEGER PRIMARY KEY, url TEXT NOT NULL)"
+telnyx-edge storage sqldb migrations list DB --local
+telnyx-edge storage sqldb migrations apply DB --local
+```
+
+Every `execute` and `migrations list`/`apply` command takes `--remote` (the deployed database) or `--local`; one of the two is required. A local database is separate from the deployed one: it never reads or changes deployed data, and no deployed database has to exist first. It runs on the same SQL engine as deployed databases, inside the actor-runtime container image, so `--local` needs Docker running (the image is pulled on first use).
+
+Pass the `[storage.sqldb]` binding name or id from `telnyx.toml` (any other name gets its own local database). Local databases live in `.telnyx/sqldb/`, are git-ignored automatically, and persist between runs; `telnyx-edge dev` serves `env.<BINDING>` from the same files. To start over, delete `.telnyx/sqldb/`. `--persist-to <dir>` keeps a database elsewhere instead (binding names still resolve against `telnyx.toml` in the current directory, so run it from the project that owns the binding); `dev` always reads `.telnyx/sqldb/`, so it does not see those, and you delete that directory yourself.
+
 `--param` binds a value to the next `?` placeholder and is repeatable; values fill the placeholders left to right, in the order the flags appear. It always sends a string — use `--param-json` for a number, boolean, or null (`--param-json 42`, `--param-json true`, `--param-json null`), since a shell cannot otherwise express the difference between `42` and `"42"`. The number of values must match the number of placeholders. Bind anything that came from outside your own script this way rather than pasting it into the statement.
 
 **Migrations:**
@@ -583,15 +596,17 @@ telnyx-edge dev --no-watch
 # Stop it, or stop it and delete the local state
 docker compose -f .telnyx/dev/compose.yaml down
 docker compose -f .telnyx/dev/compose.yaml down -v
+# ...and delete local [storage.sqldb] databases too, for a full reset
+rm -rf .telnyx/sqldb
 ```
 
-To restart the stack, re-run the same `telnyx-edge dev` command: it recreates every container and keeps your local state. Restarting the function or actor container on its own (`docker compose restart function-runtime`, or `docker restart`) also works.
+To restart the stack, re-run the same `telnyx-edge dev` command: it recreates every container and keeps your local state. Restarting the function or an actor container on its own (`docker compose restart function-runtime`, or `docker restart`) also works. As in production, each actor type runs in its own container, named `actor-rt-<type>-<hash>-runtime`; `dev` prints each name when the stack is ready.
 
 Your function is served at `http://127.0.0.1:8787` (`--port` changes it). The first run downloads the runtime images (about 1 GB).
 
-What works locally: `[[actors]]`, including `ctx.storage` (key-value and SQL) and alarms, and your function's `[env_vars]` in `process.env`. Local state persists between runs until you `down -v`. `[[secrets]]`, `[telnyx]`, `[storage.*]` and `[[ratelimits]]` are not available locally yet: `dev` lists the ones your project declares when it starts, and they are `undefined` in your code. `dev` writes its files under `.telnyx/`; add that to your `.gitignore`.
+What works locally: `[[actors]]`, including `ctx.storage` (key-value and SQL) and alarms, your function's `[env_vars]` in `process.env`, and each actor type's actor-scoped env vars (`[env_vars.shared]` + `[env_vars.actor]` + that type's `[[actors]]` `env_vars`) in that actor's `process.env`. Local state persists between runs until you `down -v`. `[storage.sqldb]` bindings work against local databases kept in `.telnyx/sqldb/` — the same ones `telnyx-edge storage sqldb execute <BINDING> --local` reads and writes — which survive `down -v`. `[[secrets]]`, `[telnyx]`, `[storage.kv]`, `[storage.cloudstorage]` and `[[ratelimits]]` are not available locally yet: `dev` lists the ones your project declares when it starts, and they are `undefined` in your code. `dev` writes its files under `.telnyx/`; add that to your `.gitignore`.
 
-In `telnyx.toml`, environment variables can also use `[env_vars.shared]`, `[env_vars.function]`, `[env_vars.actor]`, and per-actor `env_vars` tables. Values must be strings. The function resolves shared, flat, then function-specific values; each actor type resolves shared, actor-wide, then per-type values. Unknown scopes fail validation; conflicting flat and function-specific values warn, with the function-specific value winning. Local `dev` applies the resolved function values but does not inject actor-scoped values into actor runtimes yet; it reports affected types as unavailable locally. Keep secrets out of these tables.
+In `telnyx.toml`, environment variables can also use `[env_vars.shared]`, `[env_vars.function]`, `[env_vars.actor]`, and per-actor `env_vars` tables. Values must be strings. The function resolves shared, flat, then function-specific values; each actor type resolves shared, actor-wide, then per-type values. Unknown scopes fail validation; conflicting flat and function-specific values warn, with the function-specific value winning. Local `dev` applies the resolved function values to the function and each actor type's resolved values to that type's own container, validated as `ship` validates them. Keep secrets out of these tables.
 
 `telnyx-edge inspect <function>` shows every binding a function declares — actors, SQL databases, KV namespaces and secrets — alongside its other details. Each row gives the `env.<NAME>` handle, the kind of binding, what it targets, and its status.
 
