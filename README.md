@@ -38,6 +38,7 @@ telnyx-edge [global options] <command> [command options]
 | `storage` | Manage storage resources (KV namespaces, SQL databases) |
 | `types` | Generate TypeScript types for your bindings |
 | `new-func` | Create a new function |
+| `update` | Update the CLI to the latest release |
 | `ship` | Deploy function to edge |
 | `delete-func` | Delete a function |
 | `reset-func` | Reset a failed function back to `created` so it can be re-shipped |
@@ -677,6 +678,8 @@ refresh_token = "your-refresh-token"
 ## 🔔 Staying up to date
 
 The CLI checks once a day for a newer release and prints an upgrade notice to stderr if you're behind. It never blocks your command. Disable with `TELNYX_NO_UPDATE_CHECK=1`.
+
+To upgrade, run `telnyx-edge update`. It downloads the latest release for your platform, verifies it against the release's published SHA-256 checksums (`telnyx-edge-<version>-SHA256SUMS`; an older release without one installs with a warning), checks that the new binary runs, and replaces the current one. It asks for confirmation first; pass `--yes` to skip the prompt (for scripts and CI). If the CLI is installed somewhere your user cannot write, such as `/usr/local/bin`, re-run it with `sudo` or install a release manually.
 
 ---
 
