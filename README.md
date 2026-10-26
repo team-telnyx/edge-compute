@@ -47,6 +47,8 @@ telnyx-edge [global options] <command> [command options]
 | `inspect` | Show a function's full details |
 | `metrics` | Show a function's recent request and resource metrics |
 | `actors` | Manage StatefulActor types |
+| `network` | Inspect and configure your Edge Compute networks and their routes |
+| `tunnel` | Expose a service on your machine to your functions |
 | `dev` | Run a `telnyx.toml` project locally (function + actors) |
 | `config` | View and change CLI preferences |
 
@@ -94,6 +96,22 @@ telnyx-edge delete-func hello-world --yes
 Destructive commands name what they are about to destroy and wait for you to type `yes` — the mistake worth catching is a wrong id, which a plain "are you sure?" would miss. Without a terminal they fail with an error naming `--yes` rather than prompting, so a pipeline never hangs on input that will not arrive.
 
 Stop being asked entirely with `TELNYX_EDGE_SKIP_CONFIRMATIONS=1` for a shell or CI job, or `telnyx-edge config set skip_confirmations true` permanently.
+
+### Private functions
+
+To disable public access, add `private = true` to the existing `[edge_compute]` section in `func.toml` or `telnyx.toml`:
+
+```toml
+[edge_compute]
+func_id = "your-function-id"
+func_name = "my-function"
+private = true
+```
+
+Ship the function to apply the change. After deployment, Knative restricts the function to cluster-local routing and removes its public Kourier route.
+This flag does not create a private network connection.
+
+To restore public access, set `private = false` or remove the field. Then ship again.
 
 ### **Project shape**
 
@@ -285,6 +303,52 @@ telnyx-edge domains delete api.example.com
 ```
 
 **Flow:** `domains add` → add the TXT record → `domains verify` → `domains cert upload` → HTTPS routing is live.
+
+### **Tunnels**
+
+A tunnel exposes a service running on your machine to a function, without opening an inbound port or running as root. The CLI keeps an outbound connection to a Telnyx relay; when traffic reaches an address you have routed to the tunnel, the relay carries it back down that connection and the CLI dials the address on your machine.
+
+```bash
+# 1. Create a tunnel and copy its token (shown once)
+telnyx-edge tunnel create chicago-dc
+
+# 2. Route a CIDR on one of your networks through it
+telnyx-edge network route add acme-prod 10.20.0.0/16 --tunnel chicago-dc
+
+# 3. Run it on the machine hosting the service — the token is all it needs
+telnyx-edge tunnel run --token tnl_...
+
+# 4. Check what is connected
+telnyx-edge tunnel get chicago-dc
+```
+
+`network route add` takes the network's name or id, and `--tunnel` takes the tunnel's name or id. Once a route is in place, traffic from a function on that network to an address inside the CIDR is carried to the machine running the tunnel, which dials that address — so the address has to be reachable from that machine.
+
+**The token is the only thing `run` needs.** It connects to the relay (`tunnel-relay.telnyx.com:8443`, over TLS), not the service API, so `run` does not read your CLI config and works on a host with no `~/.telnyx-edge` and no writable home — a container, or a machine where you are not root. `tunnel create` and `tunnel rotate-token` print the token once and never again; `tunnel get` and `tunnel list` do not show it, and there is no way to read it back. **Store it when you create it.**
+
+```bash
+# List your tunnels (name, id, status, connections)
+telnyx-edge tunnel list
+
+# Show a tunnel's status and the processes connected to it
+telnyx-edge tunnel get chicago-dc
+
+# Issue a new token and invalidate the old one
+telnyx-edge tunnel rotate-token chicago-dc
+
+# List a network's routes, including the ones the platform writes itself
+telnyx-edge network route list acme-prod
+
+# Remove a route
+telnyx-edge network route delete <route-id>
+
+# Remove a tunnel (refused while a route still points at it)
+telnyx-edge tunnel delete chicago-dc
+```
+
+A tunnel with no process connected to it (`tunnel get` shows `CONNECTIONS` of `0`) relays nothing, so check that first if traffic is not arriving. `tunnel delete` is refused while a network route still names the tunnel and lists the routes to remove — delete those first, then the tunnel. A route CIDR must be the network address (`10.20.0.0/16`, not `10.20.3.7/16`) and must not overlap ranges the platform reserves for itself.
+
+`tunnel run` reconnects on its own if the session drops. If the relay refuses the token — a token that `rotate-token` has replaced — it stops with a non-zero exit instead of retrying forever. If a route was added just now, the first call through it can fail once while it is applied; retry.
 
 ### **KV Storage (Key-Value Storage)**
 
