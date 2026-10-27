@@ -483,12 +483,12 @@ telnyx-edge storage sqldb export <database-id> --remote --table links --table cl
 telnyx-edge storage sqldb export <database-id> --remote --no-data --output ./schema.sql
 telnyx-edge storage sqldb export <database-id> --remote --no-schema --output ./data.sql
 
-# Copy one database into another
+# Copy one database into another (dumps within the ~4 MiB remote script limit)
 telnyx-edge storage sqldb export <source-id> --remote --output - \
   | telnyx-edge storage sqldb execute <target-id> --remote --file -
 ```
 
-`export` writes the database out as SQL text — `CREATE` statements, then `INSERT` statements, then the indexes, views and triggers — and the result re-imports with `execute --file`. That makes it the way to take a backup, move a database between environments, or just read what is actually stored. `--output` is required; `-` writes to stdout so the dump can be piped. The file is written in full and then moved into place, so an interrupted export never overwrites a previous backup with a partial one. On macOS and Linux it is created readable only by you, since a dump is every row of your database in plaintext — on Windows, file permissions are left to the directory you write into.
+`export` writes the database out as SQL text — `CREATE` statements, then `INSERT` statements, then the indexes, views and triggers. That makes it the way to take a backup, move a database between environments, or just read what is actually stored. `execute --remote --file`, piped or from a file, sends the whole file as one request, so it re-imports a dump only if the dump fits the ~4 MiB SQL script limit for remote execution, and refuses a larger one as too large. The dump is still a complete, valid SQL file: `execute --local --file` is not subject to the remote request limit, and `sqlite3` reads the file directly. Exports themselves go up to 4 GiB. `--output` is required; `-` writes to stdout so the dump can be piped. The file is written in full and then moved into place, so an interrupted export never overwrites a previous backup with a partial one. On macOS and Linux it is created readable only by you, since a dump is every row of your database in plaintext — on Windows, file permissions are left to the directory you write into.
 
 Values keep their exact type on the way out and back: integers too large for a JSON number, full-precision floats, BLOBs and text that is not valid UTF-8 all re-import as what they were. `AUTOINCREMENT` counters are restored too, so a re-imported database will not re-issue a row id the original had already used.
 
