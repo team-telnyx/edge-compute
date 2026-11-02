@@ -47,7 +47,7 @@ telnyx-edge [global options] <command> [command options]
 | `inspect` | Show a function's full details |
 | `metrics` | Show a function's recent request and resource metrics |
 | `actors` | Manage StatefulActor types |
-| `network` | Inspect and configure your Edge Compute networks and their routes |
+| `network` | Create and manage your networks, WireGuard Interfaces and Tailscale Subnet Routers, list their regions, and route their traffic |
 | `tunnel` | Expose a service on your machine to your functions |
 | `dev` | Run a `telnyx.toml` project locally (function + actors) |
 | `config` | View and change CLI preferences |
@@ -112,6 +112,24 @@ Ship the function to apply the change. After deployment, Knative restricts the f
 This flag does not create a private network connection.
 
 To restore public access, set `private = false` or remove the field. Then ship again.
+
+### Reaching a function from your network
+
+A `[network.<NAME>]` binding joins the function to a WireGuard Interface. `telnyx-edge network interface create <network> --region <code> --wait` prints the block to paste. Add `ingress = true` so devices on the network can call the function:
+
+```toml
+[network.ACME_PROD]
+id = "749de8c6-bbd0-42dd-9a16-770a519b565d"   # the interface's ID
+ingress = true
+```
+
+After `ship`, the function's private address and hostname appear in the ship output and in `telnyx-edge inspect <func>` (Private Address, Private Hostnames). Setup finishes shortly after the deploy; Private Status turns `active` when it is ready. Call the address with the private hostname as `Host`:
+
+```bash
+curl -H 'Host: my-function-3be52906-7.private.telnyxcompute.com' http://172.27.0.5/
+```
+
+Combine it with `private = true` to serve only the network.
 
 ### **Project shape**
 
@@ -304,6 +322,73 @@ telnyx-edge domains delete api.example.com
 
 **Flow:** `domains add` → add the TXT record → `domains verify` → `domains cert upload` → HTTPS routing is live.
 
+### **Networks**
+
+A network is the private address space your functions join through a `[network.<NAME>]` binding.
+
+```bash
+# Create a network
+telnyx-edge network create demo
+
+# List your networks, or show one by name or id
+telnyx-edge network list
+telnyx-edge network get demo
+
+# Rename it (its id and everything on it stay the same)
+telnyx-edge network rename demo demo-prod
+
+# See which regions offer WireGuard Interfaces (cloud_vpn) or Tailscale Subnet Routers
+telnyx-edge network regions --service cloud_vpn
+telnyx-edge network regions --service tailscale_subnet_router
+
+# Delete it
+telnyx-edge network delete demo-prod
+```
+
+The `CODE` column of `network regions` is the region code that network resources are created in. `network delete` asks for confirmation; pass `--yes` to skip it in scripts. It is refused while a WireGuard Interface or Tailscale Subnet Router is still on the network: delete those first.
+
+#### WireGuard Interfaces
+
+A WireGuard Interface is the per-region gateway a function joins a network through.
+
+```bash
+# Create one and wait until it is provisioned (takes minutes)
+telnyx-edge network interface create demo --region ashburn-va --wait
+
+# List them (all, or one network's), show one, delete one
+telnyx-edge network interface list demo
+telnyx-edge network interface get <name|id>
+telnyx-edge network interface delete <name|id>
+```
+
+`--wait` ends by printing the block that binds a function to the interface; paste it into `telnyx.toml`:
+
+```toml
+[network.DEMO]
+id = "<interface-id>"
+```
+
+The `id` is the interface's id, not the network's. Without `--wait`, or if `--timeout` (default 30m) runs out first, the command prints the interface id instead; check on it with `network interface get`. `--subnet 172.27.1.1/24` picks the interface's address and subnet instead of the default. An interface can only be deleted once it has finished provisioning.
+
+#### Tailscale Subnet Routers
+
+A Tailscale Subnet Router joins your tailnet and advertises a network's subnets into it, so your tailnet devices reach the network's functions.
+
+```bash
+# Create one; the auth key comes from a file, stdin (-) or $TELNYX_TAILSCALE_AUTH_KEY
+telnyx-edge network router create demo --region ashburn-va \
+  --route 172.27.0.0/24 --auth-key-file key.txt --wait
+
+# List, show, change routes, retry a failed deploy, delete
+telnyx-edge network router list demo
+telnyx-edge network router get <name|id>
+telnyx-edge network router set-routes <name|id> --route 172.27.0.0/24 --route 172.27.1.0/24
+telnyx-edge network router retry <name|id>
+telnyx-edge network router delete <name|id>
+```
+
+The auth key is never a flag value, so it stays out of your shell history and process list; use a reusable, pre-authorized, non-ephemeral key. With `--wait`, `create` prints the router's tailnet machine name (`ts` and 8 characters), its Tailscale IPs and its address on the network. Approve the advertised routes for that machine in the Tailscale admin console (or with `autoApprovers`) before devices can use them. If a deploy fails, `retry` redeploys it; pass a new key with `--auth-key-file` if Tailscale rejected the old one.
+
 ### **Tunnels**
 
 A tunnel exposes a service running on your machine to a function, without opening an inbound port or running as root. The CLI keeps an outbound connection to a Telnyx relay; when traffic reaches an address you have routed to the tunnel, the relay carries it back down that connection and the CLI dials the address on your machine.
@@ -488,13 +573,31 @@ telnyx-edge storage sqldb export <source-id> --remote --output - \
   | telnyx-edge storage sqldb execute <target-id> --remote --file -
 ```
 
-`export` writes the database out as SQL text — `CREATE` statements, then `INSERT` statements, then the indexes, views and triggers. That makes it the way to take a backup, move a database between environments, or just read what is actually stored. `execute --remote --file`, piped or from a file, sends the whole file as one request, so it re-imports a dump only if the dump fits the ~4 MiB SQL script limit for remote execution, and refuses a larger one as too large. The dump is still a complete, valid SQL file: `execute --local --file` is not subject to the remote request limit, and `sqlite3` reads the file directly. Exports themselves go up to 4 GiB. `--output` is required; `-` writes to stdout so the dump can be piped. The file is written in full and then moved into place, so an interrupted export never overwrites a previous backup with a partial one. On macOS and Linux it is created readable only by you, since a dump is every row of your database in plaintext — on Windows, file permissions are left to the directory you write into.
+`export` writes the database out as SQL text — `CREATE` statements, then `INSERT` statements, then the indexes, views and triggers. That makes it the way to take a backup, move a database between environments, or just read what is actually stored. To restore a dump, use `import` (below). `execute --remote --file`, piped or from a file, sends the whole file as one request, so it only suits dumps within the ~4 MiB SQL script limit for remote execution, and refuses a larger one as too large. `execute --local --file` is not subject to the remote request limit, and `sqlite3` reads the file directly. Exports themselves go up to 4 GiB. On success `export` prints the export id, which `import --from-export` takes. `--output` is required; `-` writes to stdout so the dump can be piped. The file is written in full and then moved into place, so an interrupted export never overwrites a previous backup with a partial one. On macOS and Linux it is created readable only by you, since a dump is every row of your database in plaintext — on Windows, file permissions are left to the directory you write into.
 
 Values keep their exact type on the way out and back: integers too large for a JSON number, full-precision floats, BLOBs and text that is not valid UTF-8 all re-import as what they were. `AUTOINCREMENT` counters are restored too, so a re-imported database will not re-issue a row id the original had already used.
 
 An export is a job: the command queues it, waits, then downloads the result. The dump is written to your own Telnyx cloud storage and fetched from there — nothing extra to configure, since the CLI uses the credentials you are already signed in with, and the copy in your bucket is cleaned up once the download window closes.
 
 Databases containing virtual tables (for example FTS5) cannot be exported, because their contents live in shadow tables that do not round-trip; the export refuses rather than writing a file that would fail on import. An export is also not a point-in-time snapshot: a write committed while it runs may be partially reflected.
+
+**Importing:**
+```bash
+# Upload a local dump (up to 100 MiB) and import it
+telnyx-edge storage sqldb import <database-id> --file ./database.sql
+
+# Restore an earlier export of the same database in place — nothing to upload
+telnyx-edge storage sqldb import <database-id> --from-export <export-id>
+
+# Resume watching an import after Ctrl-C
+telnyx-edge storage sqldb import status <database-id> <import-id>
+```
+
+`import` restores a dump through your own Telnyx cloud storage rather than one request, so it is not held to the ~4 MiB `execute` limit; a dump can be up to 100 MiB, and a larger one is refused before it is uploaded. The whole dump is checked before any of it runs, then applied in batches, in order, while the command shows how many batches and statements have been applied. A large import takes minutes and the command waits as long as it takes; `Ctrl-C` stops waiting, not the import, and prints the `import status` command to pick it up again. `--json` prints the finished import as JSON.
+
+Each batch is atomic, but the import as a whole is not: if a batch fails, the batches before it stay applied, nothing after it runs, and the command prints the error naming the failed batch and exits non-zero. Import into an empty database. If the target already has tables, `import` asks for confirmation first; `--yes` skips the prompt. The database must be ready (`provision_ok`).
+
+With `--file`, the uploaded copy is removed from your storage once the import completes. If the import fails, the copy is kept and the command prints its bucket and key. An export used with `--from-export` is never deleted by an import.
 
 **Binding a database to a function** — add the block to your function's manifest (`func.toml`, or `telnyx.toml` if your project uses one):
 ```toml
