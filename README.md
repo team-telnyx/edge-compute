@@ -131,6 +131,15 @@ curl -H 'Host: my-function-3be52906-7.private.telnyxcompute.com' http://172.27.0
 
 Combine it with `private = true` to serve only the network.
 
+To call it by name from a laptop, add a DNS server to the network, then the laptop as a WireGuard peer. `peer create` writes a ready `wg-quick` config with the private key, routes and DNS server:
+
+```bash
+telnyx-edge network dns create <network> --region <code> --wait
+telnyx-edge network peer create <interface> laptop        # writes ./laptop.conf (0600)
+wg-quick up ./laptop.conf
+curl http://my-function-3be52906-7.private.telnyxcompute.com/
+```
+
 ### **Project shape**
 
 Your manifest picks how the project is built, so `ship` checks the entrypoint agrees before uploading anything.
