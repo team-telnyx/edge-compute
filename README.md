@@ -93,6 +93,38 @@ telnyx-edge delete-func hello-world --yes
 
 `ship` stays attached and reports each stage until the function is live, which is why an unqualified `ship` can sit there for a while: it waits up to 30 minutes before giving up. That is a monitoring limit, not a deploy limit — on timeout the deploy carries on server-side and `telnyx-edge ship status <func>` tells you how it ended. Pass `--timeout` to wait longer, or to cap the wait shorter for CI.
 
+### **Building on your machine**
+
+For Go, Python and `func.toml` TypeScript/JavaScript projects, `ship` builds the function on your machine and uploads the result, so there is no remote build to wait for. Other languages (and `telnyx.toml` projects, which `ship` already bundles locally) are unchanged.
+
+| Project | What `ship` runs locally | You need |
+|---|---|---|
+| Go | `go build` of your `Handle` into a static Linux binary (no cgo); only the binary ships, so embed templates or other files with `//go:embed` | the Go toolchain (`go`) |
+| Python | packs `function/` and nothing else, so keep your modules and data files inside it; dependencies from `pyproject.toml` or `requirements.txt` are resolved for Linux | [`uv`](https://docs.astral.sh/uv/), only when there are dependencies |
+| TypeScript/JavaScript (`package.json`) | `npm ci` from your lockfile and `npm run build` when you have a build script, then `npm ci --omit=dev` for Linux; the function starts with `npm start` (or `node server.js`) | `node` and `npm`, and a `package-lock.json` when there are dependencies |
+
+A build error stops the ship before anything is uploaded, with the tool's own output:
+
+```text
+❌ Building the Go bundle failed:
+  ./handler.go:18:20: cannot use "three" (untyped string constant) as int value in variable declaration
+💡 Fix the build errors above and try again. The function must export Handle(http.ResponseWriter, *http.Request) in the module's root package.
+```
+
+Limits: the code, dependencies included, is at most 50 MB compressed.
+
+Node dependencies install once per lockfile. With Docker running, `ship` installs them in a Linux container, where install scripts run and native addons (such as `bcrypt` or `better-sqlite3`) get their prebuilt Linux binaries; a package with no prebuilt binary for Node 24, which would have to compile, is not supported. The container install is prepared in your user cache folder (`~/Library/Caches/telnyx-edge` on macOS, `~/.cache/telnyx-edge` on Linux, `%LocalAppData%\telnyx-edge` on Windows), which Docker Desktop shares by default. If Docker cannot see it, `ship` stops and names the folder: share it with Docker (Docker Desktop: Settings > Resources > File sharing), or ship with Docker stopped to install on your machine. Without Docker, it installs them on your machine without install scripts: packages that publish a binary per platform, such as esbuild or sharp, still work, but one that builds or downloads a binary on install (such as `bcrypt`, `better-sqlite3` or Prisma's engines) is refused until Docker is running, and Windows needs Docker or WSL. With npm 12's `allowScripts` in `package.json`, only the packages you approve with `npm install-scripts approve` count as needing their install script; without it, any install script does.
+
+If the function then fails to start, `ship` prints why and the function's own output:
+
+```text
+❌ Function 'my-func' shipping failed after 3m5s
+   Your function exited during startup with exit code 1. Run `telnyx-edge logs my-func` to see its output, fix the error, then ship again.
+
+─── Startup logs ───
+RuntimeError: DATABASE_URL is not set
+```
+
 Destructive commands name what they are about to destroy and wait for you to type `yes` — the mistake worth catching is a wrong id, which a plain "are you sure?" would miss. Without a terminal they fail with an error naming `--yes` rather than prompting, so a pipeline never hangs on input that will not arrive.
 
 Stop being asked entirely with `TELNYX_EDGE_SKIP_CONFIRMATIONS=1` for a shell or CI job, or `telnyx-edge config set skip_confirmations true` permanently.
@@ -178,7 +210,7 @@ telnyx-edge deployments my-func
 telnyx-edge rollback my-func <revision-id>
 ```
 
-`deployments` prints one row per ship: the revision id (a short image SHA), the author, timestamp, outcome, build duration, which revision is currently active, the commit, and — for a ship that failed — the stage it failed at and the reason, as columns on that ship's own row. A long reason is shortened with `…` to keep the table readable; `--json` gives you the full text. `rollback` switches the active revision to an existing one within seconds; a ship that never reached a healthy deploy cannot be a rollback target, and one whose build failed has no revision id at all.
+`deployments` prints one row per ship: the revision id (a short image SHA, or an id for a function built on your machine), the author, timestamp, outcome, build duration (none for a function built on your machine), which revision is currently active, the commit, and — for a ship that failed — the stage it failed at and the reason, as columns on that ship's own row. A long reason is shortened with `…` to keep the table readable; `--json` gives you the full text. `rollback` switches the active revision to an existing one within seconds; a ship that never reached a healthy deploy cannot be a rollback target, and one whose build failed has no revision id at all.
 
 ### **Why a Ship Failed**
 
@@ -192,7 +224,7 @@ telnyx-edge ship status my-func
 telnyx-edge ship status my-func --logs
 ```
 
-The reason comes straight from the platform. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy** failure shows why — e.g. the function crashed on startup (with its own crash output under `--logs`) or never became ready; a **platform** or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
+The reason comes straight from the platform. A function built on your machine reports its build errors during `ship` itself, so `ship status` reports how its deploy went. A **build** failure shows the compiler/build error (and the log snippet under `--logs`); a **deploy** failure shows why — e.g. the function crashed on startup (with its own crash output under `--logs`) or never became ready; a **platform** or **security review** failure shows a short explanation on its own line. `ship status` is read-only and accepts a function name or id.
 
 ### **Logs**
 
