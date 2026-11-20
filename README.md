@@ -198,6 +198,8 @@ That combination is worth catching early because nothing downstream reports it: 
 
 For `telnyx.toml` projects, `ship` asks before upload if its check detects an actor type whose owning function was deleted and whose class this bundle exports. Shipping makes this function the owner and redeploys the actor with this function's code and actor environment variables, preserving its state. Use `ship --yes` to confirm in scripts; otherwise a required confirmation fails without a terminal. The check is advisory and is skipped if the actor lookup fails. Non-fatal deployment-service warnings are printed after upload.
 
+A `telnyx.toml` project fails to bundle, with the file and line, when its code would build but always break when it runs, such as a call on an import namespace or an assignment to a constant. `import.meta.url`, `import.meta.dirname` and `import.meta.filename` work. Other bundler warnings are printed and do not block.
+
 ### **Revisions & Rollback**
 
 Every successful `ship` creates an immutable revision. Inspect a function's deploy history and instantly revert to a previous revision — no rebuild or re-upload required.
