@@ -49,6 +49,7 @@ telnyx-edge [global options] <command> [command options]
 | `actors` | Manage StatefulActor types |
 | `network` | Create and manage your networks, WireGuard Interfaces and Tailscale Subnet Routers, list their regions, and route their traffic |
 | `tunnel` | Expose a service on your machine to your functions |
+| `sandbox-cpu` | Create and manage CPU sandboxes: isolated Linux machines for running code |
 | `dev` | Run a `telnyx.toml` project locally (function + actors) |
 | `config` | View and change CLI preferences |
 
@@ -477,6 +478,23 @@ telnyx-edge tunnel delete chicago-dc
 A tunnel with no process connected to it (`tunnel get` shows `CONNECTIONS` of `0`) relays nothing, so check that first if traffic is not arriving. `tunnel delete` is refused while a network route still names the tunnel and lists the routes to remove — delete those first, then the tunnel. A route CIDR must be the network address (`10.20.0.0/16`, not `10.20.3.7/16`) and must not overlap ranges the platform reserves for itself.
 
 `tunnel run` reconnects on its own if the session drops. If the relay refuses the token — a token that `rotate-token` has replaced — it stops with a non-zero exit instead of retrying forever. If a route was added just now, the first call through it can fail once while it is applied; retry.
+
+### **CPU Sandboxes**
+
+A CPU sandbox is an isolated Linux machine for running code, such as an AI agent's commands, created from a container image. You run commands in it with `exec`, copy files in and out, reach its ports over HTTPS, snapshot it, and pause and resume it with its state kept.
+
+```bash
+# Create a sandbox from an image and wait until it runs (the command after -- keeps it alive)
+telnyx-edge sandbox-cpu create --image docker.io/library/python:3.13-slim --name job -- sleep infinity
+
+# Run a command in it; this exits with the command's exit code
+telnyx-edge sandbox-cpu exec job -- python -c 'print(1 + 1)'
+
+# Terminate it (asks for confirmation; --yes skips the prompt)
+telnyx-edge sandbox-cpu terminate job --yes
+```
+
+A sandbox is terminated after 300 seconds unless you pass `--timeout` or `--no-timeout` to `create`. Run `telnyx-edge sandbox-cpu --help` for every command, and see the [Agent Sandboxes documentation](https://developers.telnyx.com/docs/edge-compute/sandboxes) for the full reference.
 
 ### **KV Storage (Key-Value Storage)**
 
